@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Aplikasi Resep Masakan by Chairil Ali</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="favicon-32x32.png" sizes="32x32" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <!-- partial:index.partial.html -->
+    <section class="recipe-container" id="recipe-container">
+      <div class="container">
+        <div class="recipe-front" v-if="!isSingleMealPage">
+          <div class="icon">
+            <a href="mailto:chairilali13@gmail.com?subject=Inquiry&body=Hello, I have a question about your products. Can you please provide more information?"><i class="fa fa-envelope"></i></a>
+          </div>
+
+          <div class="recipe-categories biodata" id="button">
+            <div class="svg hide" id="svg"></div>
+            <ul>
+              <li>
+                <button>Chairil Ali</button>
+              </li>
+              <li>
+                <button>200102121</button>
+              </li>
+            </ul>
+          </div>
+
+          <div class="recipe-header">
+            <h1 v-html="title"></h1>
+          </div>
+
+          <div class="recipe-search">
+            <button @click="searchMeal" class="fa fa-search"></button>
+            <input @keyup.enter="searchMeal" v-model="meal" type="text" id="search" placeholder="Cari" />
+          </div>
+
+          <div class="recipe-categories">
+            <ul @wheel="scrollCategories($event)" id="scroll-categories">
+              <li><button @click="getCategories" class="active">Semua</button></li>
+              <li v-for="(item, index) in navigation" :key="item.idCategory">
+                <button @click="getCategory" :data-category="item.strCategory">${item.strCategory}</button>
+              </li>
+            </ul>
+          </div>
+
+          <div v-if="isNoResults" class="no-results">No results found.</div>
+
+          <div v-if="isCategories" class="all-categories recipe-list">
+            <div v-for="(item, index) in categories" :key="item.idCategory" @click="getCategory" :data-category="item.strCategory" :data-meal="item.idMeal" :style="{'background-image':`url(${item.strCategoryThumb})`}" class="recipe-item">
+              <div v-if="isCategories">
+                <h2>${item.strCategory}</h2>
+                <h5>${item.strCategoryDescription}</h5>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="isCategory" class="all-category recipe-list">
+            <div v-for="(item, index) in category" :key="item.idCategory" @click="getMeal()" :data-category="item.strCategory" :data-meal="item.idMeal" :style="{'background-image':`url(${item.strMealThumb})`}" class="recipe-item">
+              <div>
+                <h2>${item.strMeal}</h2>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="recipe-single" v-if="isSingleMealPage">
+          <div class="recipe-header">
+            <div>
+              <button @click="backToCategory" class="fa fa-arrow-left"></button>
+              <button @click="toggleVideo" class="fa fa-ellipsis"></button>
+            </div>
+            <h1>${singleMeal.name}</h1>
+          </div>
+
+          <div v-if="singleMeal.video != null">
+            <div class="recipe-video" v-if="isVideo">
+              <iframe :src="`https://www.youtube.com/embed/${singleMeal.video}`" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            </div>
+          </div>
+
+          <div class="ingredients-instuctions">
+            <div>
+              <h3 v-if="isSingleContent">Ingredients (${singleMeal.ingredientsCounter})</h3>
+              <h3 v-if="!isSingleContent">Instructions</h3>
+            </div>
+
+            <div>
+              <button @click="toggleSingleContent" class="fa fa-sliders"></button>
+            </div>
+          </div>
+
+          <div class="recipe-ingredients" v-if="isSingleContent">
+            <div class="recipe-ingredients-list">
+              <div v-for="(item, index) in singleMeal.ingredients" :key="index">
+                <div class="recipe-ingredient" v-if="item.ingredient != ''">
+                  <h5>${item.ingredient}</h5>
+                  <h6>${item.measurement}</h6>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="recipe-instructions" v-if="!isSingleContent">
+            <div class="recipe-instructions-list">
+              <ol>
+                <li v-for="(item, index) in singleMeal.instructions" :key="index">${item}</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://unpkg.com/vue@3.0.5"></script>
+    <script>
+      const recipe = Vue.createApp({
+        delimiters: ["${", "}"],
+        data() {
+          return {
+            title: "Aplikasi resep masakan western and europe",
+            navigation: [],
+            categories: [],
+            category: [],
+            meal: "",
+            singleMeal: {
+              id: "",
+              name: "",
+              video: "",
+              instructions: [],
+              ingredients: [],
+              ingredientsCounter: null,
+              showVideos: true,
+              singleContent: true,
+            },
+            showResults: false,
+            showCategories: true,
+            showCategory: false,
+            showSingleMealPage: false,
+          };
+        },
+        methods: {
+          getCategories() {
+            this.showCategories = true;
+            this.showCategory = false;
+            this.showResults = false;
+            this.meal = "";
+
+            axios
+              .get("https://www.themealdb.com/api/json/v1/1/categories.php")
+              .then((response) => {
+                this.categories = response.data.categories;
+                this.navigation = response.data.categories;
+              })
+              .catch((error) => {
+                console.log(`Error on getCategories: ${error}`);
+              });
+
+            if (event != undefined) {
+              if (event.target.localName == "button") {
+                document.querySelectorAll(".recipe-categories button").forEach((item) => item.classList.remove("active"));
+                event.target.classList.add("active");
+              }
+            }
+          },
+          getCategory() {
+            this.showCategories = false;
+            this.showCategory = true;
+            this.showResults = false;
+            this.meal = "";
+
+            const category = event.target.dataset.category;
+
+            axios
+              .get(`https://www.themealdb.com/api/json/v1/1/filter.php?c=${category}`)
+              .then((response) => {
+                this.category = response.data.meals;
+              })
+              .catch((error) => {
+                console.log(`Error on getSingleCategoryOrMeal [else]: ${error}`);
+              });
+
+            if (event.target.localName == "button") {
+              document.querySelectorAll(".recipe-categories button").forEach((item) => item.classList.remove("active"));
+              event.target.classList.add("active");
+            }
+          },
+          searchMeal() {
+            this.showCategories = false;
+            this.showCategory = true;
+            this.showResults = false;
+
+            const searchedMeal = this.meal;
+
+            axios
+              .get(`https://www.themealdb.com/api/json/v1/1/search.php?s=${searchedMeal}`)
+              .then((response) => {
+                if (response.data.meals != null) {
+                  this.category = response.data.meals;
+                } else {
+                  this.showResults = true;
+                }
+              })
+              .catch((error) => {
+                console.log(`Error on getSingleCategoryOrMeal [if]: ${error}`);
+              });
+
+            document.querySelectorAll(".recipe-categories button").forEach((item) => item.classList.remove("active"));
+          },
+          getMeal() {
+            this.showSingleMealPage = true;
+
+            const mealId = event.target.dataset.meal;
+
+            axios
+              .get(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${mealId}`)
+              .then((response) => {
+                const data = response.data.meals[0];
+
+                this.singleMeal.id = data.idMeal;
+                this.singleMeal.name = data.strMeal;
+                this.singleMeal.video = data.strYoutube.split("=")[1];
+                this.singleMeal.instructions = data.strInstructions.split("\n");
+                this.singleMeal.ingredients = [
+                  { ingredient: data.strIngredient1, measurement: data.strMeasure1 },
+                  { ingredient: data.strIngredient2, measurement: data.strMeasure2 },
+                  { ingredient: data.strIngredient3, measurement: data.strMeasure3 },
+                  { ingredient: data.strIngredient4, measurement: data.strMeasure4 },
+                  { ingredient: data.strIngredient5, measurement: data.strMeasure5 },
+                  { ingredient: data.strIngredient6, measurement: data.strMeasure6 },
+                  { ingredient: data.strIngredient7, measurement: data.strMeasure7 },
+                  { ingredient: data.strIngredient8, measurement: data.strMeasure8 },
+                  { ingredient: data.strIngredient9, measurement: data.strMeasure9 },
+                  { ingredient: data.strIngredient10, measurement: data.strMeasure10 },
+                  { ingredient: data.strIngredient11, measurement: data.strMeasure11 },
+                  { ingredient: data.strIngredient12, measurement: data.strMeasure12 },
+                  { ingredient: data.strIngredient13, measurement: data.strMeasure13 },
+                  { ingredient: data.strIngredient14, measurement: data.strMeasure14 },
+                  { ingredient: data.strIngredient15, measurement: data.strMeasure15 },
+                  { ingredient: data.strIngredient16, measurement: data.strMeasure16 },
+                  { ingredient: data.strIngredient17, measurement: data.strMeasure17 },
+                  { ingredient: data.strIngredient18, measurement: data.strMeasure18 },
+                  { ingredient: data.strIngredient19, measurement: data.strMeasure19 },
+                  { ingredient: data.strIngredient20, measurement: data.strMeasure20 },
+                ];
+
+                const allIngredients = this.singleMeal.ingredients.filter((item) => item.ingredient != "");
+
+                this.singleMeal.ingredientsCounter = allIngredients.length;
+                this.showSingleMealPage = true;
+              })
+              .catch((error) => {
+                console.log(`Error on getSingleCategoryOrMeal [if]: ${error}`);
+              });
+          },
+          toggleVideo() {
+            this.singleMeal.showVideos = !this.singleMeal.showVideos;
+          },
+          toggleSingleContent() {
+            this.singleMeal.singleContent = !this.singleMeal.singleContent;
+          },
+          backToCategory() {
+            this.showSingleMealPage = false;
+            this.singleMeal.singleContent = true;
+            this.singleMeal.showVideos = true;
+            this.meal = "";
+            this.getCategories();
+          },
+          scrollCategories() {
+            event.preventDefault();
+
+            document.querySelector("#scroll-categories").scrollBy({
+              left: event.deltaY < 0 ? -60 : 60,
+            });
+          },
+        },
+        computed: {
+          isCategories() {
+            return this.showCategories;
+          },
+          isCategory() {
+            return this.showCategory;
+          },
+          isNoResults() {
+            return this.showResults;
+          },
+          isSingleMealPage() {
+            return this.showSingleMealPage;
+          },
+          isSingleContent() {
+            return this.singleMeal.singleContent;
+          },
+          isVideo() {
+            return this.singleMeal.showVideos;
+          },
+        },
+        mounted() {
+          this.getCategories();
+        },
+      }).mount("#recipe-container");
+    </script>
+    <!-- partial -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.7.5/lottie.min.js"></script>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
